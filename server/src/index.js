@@ -3,6 +3,7 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 import { Server } from 'socket.io';
 import { deck } from './deck.js';
+import { createDrawPile, drawCards } from './deal.js';
 import { calculateScores, comparisons } from './scoring.js';
 
 const app = express();
@@ -88,7 +89,7 @@ function enter(socket, room, player) {
   sendState(room);
 }
 function startRound(room) {
-  room.cards = deck[room.round % deck.length];
+  room.cards = drawCards(room);
   room.answers.clear();
   room.votes.clear();
   room.ready.clear();
@@ -109,6 +110,7 @@ function advanceWhenEverybodyReady(room) {
   if (room.phase === 'lobby') {
     if (room.players.length < MIN_PLAYERS) return;
     room.round = 0;
+    room.drawPile = createDrawPile(deck);
     startRound(room);
   } else if (room.phase === 'reveal') {
     room.ready.clear();
@@ -126,6 +128,7 @@ function advanceWhenEverybodyReady(room) {
     room.votes.clear();
     room.ready.clear();
     room.cards = [];
+    room.drawPile = [];
     room.phase = 'lobby';
   }
 }
@@ -136,7 +139,7 @@ io.on('connection', socket => {
     if (!name) return sendError(socket, 'Inserisci un nickname.', ack);
     const room = {
       code: createCode(), phase: 'lobby', round: 0, totalRounds: 5,
-      players: [], cards: [], answers: new Map(), votes: new Map(), ready: new Set(), touched: Date.now()
+      players: [], cards: [], drawPile: [], answers: new Map(), votes: new Map(), ready: new Set(), touched: Date.now()
     };
     const p = { id: crypto.randomUUID(), name, token: crypto.randomUUID(), socketId: null, score: 0 };
     room.players.push(p);
