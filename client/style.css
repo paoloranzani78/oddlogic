@@ -18,6 +18,16 @@ button:focus-visible,input:focus-visible{outline:3px solid #d8c7ff;outline-offse
 .score-dialog h2{margin-top:0}
 .score-dialog .player{gap:12px}
 .score-dialog>button{margin-top:16px}
+.header-actions{display:flex;align-items:center;gap:10px}
+.rules-button{width:44px;height:44px;padding:0;border-radius:50%;background:#393450;color:#f5f3ff;font-size:20px}
+.score-rules{padding-left:22px;line-height:1.5}
+.score-rules li+li{margin-top:8px}
+.answer-status{display:flex;flex-wrap:wrap;gap:8px 14px;margin:8px 0 0;padding:0;list-style:none;font-size:13px}
+.answer-status li{display:flex;align-items:baseline;gap:6px;overflow-wrap:anywhere;min-width:0}
+.answer-status span{font-weight:800}
+.answer-status .answered{color:#c3f6bd}
+.answer-status .waiting{color:#ff9cae}
+@media(max-width:380px){.header-actions small{display:none}}
 .gamecard[draggable="true"]{cursor:grab;touch-action:manipulation}
 .gamecard[draggable="true"]:hover{border-color:#bfa6ff;background:#352c56}
 .pair-builder{display:grid;gap:12px;margin-bottom:16px}

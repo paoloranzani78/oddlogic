@@ -20,6 +20,7 @@ createApp({
     const draggedCard = ref(null);
     const reasons = ref(['', '']);
     const scoreDialog = ref(null);
+    const rulesDialog = ref(null);
     const scorePlayer = ref(null);
     const me = computed(() => state.value?.players.find(p => p.id === state.value.me));
     const used = computed(() => slots.value.filter(card => card !== null));
@@ -198,14 +199,30 @@ createApp({
     return {
       state, name, code, error, connected, connecting, serverUrl, me, sortedPlayers,
       slots, reasons, used, nextSlot, odd, canEdit, canSubmit, draggedCard, playerName, cardName, cardIcon, readyMessage,
-      revealedPairs, excludedCards, scoreDialog, scorePlayer, showScore, closeScore,
+      revealedPairs, excludedCards, scoreDialog, rulesDialog, scorePlayer, showScore, closeScore,
       create, join, ready, placeCard, removeCard, startDrag, endDrag, allowDrop, dropCard,
       submit, vote, copyInvite, leave, leaving
     };
   },
   template: `
     <main class="shell">
-      <header><div class="brand">✦ ODD <span>LOGIC</span></div><small>PARTY GAME ONLINE</small></header>
+      <header>
+        <div class="brand">✦ ODD <span>LOGIC</span></div>
+        <div class="header-actions">
+          <small>PARTY GAME ONLINE</small>
+          <button type="button" class="rules-button" aria-label="Regole del punteggio"
+            aria-haspopup="dialog" @click="rulesDialog.showModal()">i</button>
+        </div>
+      </header>
+      <dialog ref="rulesDialog" class="panel score-dialog" aria-labelledby="rules-title">
+        <h2 id="rules-title">Come si fanno i punti?</h2>
+        <ul class="score-rules">
+          <li><b>+1</b> per ogni altro giocatore che ha scelto la stessa coppia di carte.</li>
+          <li><b>+1 bonus</b> se anche la motivazione coincide, ignorando maiuscole e minuscole. Per motivazioni diverse serve il sì della maggioranza degli altri giocatori.</li>
+          <li><b>+1</b> per ogni altro giocatore che ha escluso la tua stessa carta.</li>
+        </ul>
+        <button type="button" class="secondary" autofocus @click="rulesDialog.close()">Chiudi</button>
+      </dialog>
       <div v-if="!serverUrl" class="alert" role="status">
         Il server multiplayer non è ancora configurato. Pubblica il backend su Render e inserisci il suo URL nel file <b>client/config.js</b>.
       </div>
@@ -292,6 +309,13 @@ createApp({
             </template>
             <div v-else class="notice">✓ Risposta inviata. Attendi gli altri giocatori.</div>
             <p class="muted">Risposte inviate: {{state.players.filter(p=>p.answered).length}} / {{state.players.length}}</p>
+            <ul class="answer-status">
+              <li v-for="p in state.players" :key="p.id">
+                {{p.name}}
+                <span role="img" :aria-label="p.answered ? 'Risposta inviata' : 'In attesa della risposta'"
+                  :class="p.answered ? 'answered' : 'waiting'">{{p.answered ? '✓' : '✕'}}</span>
+              </li>
+            </ul>
           </section>
 
           <section v-if="state.phase==='reveal'" class="panel">
@@ -353,6 +377,7 @@ createApp({
                 <h2 id="score-title">Punti del round · {{scorePlayer.name}}</h2>
                 <div v-for="(detail,i) in state.roundResults?.[scorePlayer.id]?.details" :key="i" class="player">
                   <span>
+                    <template v-if="detail.cards.length === 1">Carta esclusa · </template>
                     <span aria-hidden="true">{{detail.cards.map(cardIcon).join(' + ')}}</span>
                     {{detail.cards.map(cardName).join(' + ')}} con <b>{{detail.partner}}</b>
                   </span>

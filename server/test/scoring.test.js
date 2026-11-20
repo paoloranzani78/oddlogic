@@ -51,3 +51,25 @@ test('motivazioni uguali al netto delle maiuscole danno il bonus e il dettaglio 
     c: { gain: 0, details: [] }
   });
 });
+
+test('la stessa carta esclusa vale un punto per ogni altro giocatore, senza votazione', () => {
+  const room = {
+    players: [
+      { id: 'a', name: 'Anna' }, { id: 'b', name: 'Bruno' },
+      { id: 'c', name: 'Chiara' }, { id: 'd', name: 'Diego' }
+    ],
+    answers: new Map([
+      ['a', { odd: 0, pairs: [] }],
+      ['b', { odd: 0, pairs: [] }],
+      ['c', { odd: 0, pairs: [] }],
+      ['d', { odd: 1, pairs: [] }]
+    ]),
+    votes: new Map()
+  };
+  assert.deepEqual(comparisons(room), []);
+  assert.deepEqual(calculateScores(room), { a: 2, b: 2, c: 2, d: 0 });
+  assert.deepEqual(calculateRoundResults(room).a.details, [
+    { cards: [0], points: 1, partner: 'Bruno' },
+    { cards: [0], points: 1, partner: 'Chiara' }
+  ]);
+});
