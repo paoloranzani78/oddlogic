@@ -1,0 +1,11 @@
+# Un unico repository GitHub: Netlify pubblica soltanto client/.
+# Questo frontend è statico: non occorrono npm install, Vite o una build.
+[build]
+  command = "echo 'Odd Logic: frontend statico, nessuna build richiesta'"
+  publish = "client"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"

@@ -1,0 +1,37 @@
+ODD LOGIC ONLINE - REPOSITORY GITHUB COMPLETO
+===============================================
+Questo e' il pacchetto COMPLETO per il repository GitHub "oddlogic".
+NON e' il pacchetto del solo frontend per Netlify.
+
+NELLA RADICE, DOPO AVER ESTRATTO, DEVI VEDERE:
+
+  client/             (sito statico da pubblicare su Netlify)
+  server/             (server multiplayer Node.js da pubblicare su Render)
+  netlify.toml        (Netlify pubblica la cartella client)
+  render.yaml         (Render usa la cartella server)
+  README.md
+  .gitignore
+
+COME CARICARE SU GITHUB SENZA TERMINALE:
+1) Apri il repository oddlogic su github.com.
+2) Add file > Upload files (se e' vuoto: uploading an existing file).
+3) Estrai lo ZIP sul PC.
+4) Entra nella cartella estratta, SELEZIONA IL CONTENUTO
+   (le cartelle client e server e tutti gli altri file),
+   trascinalo nella pagina Upload files di GitHub.
+5) Verifica che nella lista dei file caricati compaiano
+   client/index.html, client/main.js, server/package.json,
+   server/src/index.js, netlify.toml e render.yaml.
+6) Premi Commit changes.
+
+IMPORTANTE: non caricare lo ZIP come file nel repository e non caricare
+solo client/. Il backend su Render serve per creare le stanze.
+
+DOPO IL CARICAMENTO:
+- Render: collega il repository oddlogic, usando render.yaml (Blueprint).
+- Apri https://<tuo-server>.onrender.com/health e verifica {"ok":true,...}.
+- Modifica client/config.js e inserisci l'URL https del server Render.
+- Netlify: collega il repository oddlogic e usa netlify.toml
+  (publish: client; nessuna build Vite necessaria).
+
+ISTRUZIONI COMPLETE: README.md

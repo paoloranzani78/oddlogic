@@ -1,0 +1,14 @@
+# Render: New > Blueprint, collegando questo stesso repository GitHub.
+services:
+  - type: web
+    name: odd-logic-server
+    runtime: node
+    rootDir: server
+    buildCommand: npm install --omit=dev
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CLIENT_ORIGIN
+        value: https://oddlogic.netlify.app
