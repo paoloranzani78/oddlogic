@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateScores, comparisons, keyFor } from '../src/scoring.js';
+import { calculateRoundResults, calculateScores, comparisons, keyFor } from '../src/scoring.js';
 
 test('ordine delle carte non cambia l’identità della coppia', () => {
   assert.equal(keyFor({ cards: [4, 1] }), '1-4');
@@ -23,4 +23,31 @@ test('una coppia condivisa vale un punto per entrambi', () => {
   assert.deepEqual(calculateScores(room), { a: 1, b: 1, c: 0 });
   room.votes.set(list[0].key + '|c', true);
   assert.deepEqual(calculateScores(room), { a: 2, b: 2, c: 0 });
+});
+
+test('motivazioni uguali al netto delle maiuscole danno il bonus e il dettaglio dei punti', () => {
+  const room = {
+    players: [{ id: 'a', name: 'Mamma' }, { id: 'b', name: 'Paolo' }, { id: 'c', name: 'Chiara' }],
+    answers: new Map([
+      ['a', { pairs: [{ cards: [0, 1], reason: 'Animali' }, { cards: [2, 3], reason: 'Vacanza' }] }],
+      ['b', { pairs: [{ cards: [1, 0], reason: 'ANIMALI' }, { cards: [2, 3], reason: 'Mare' }] }],
+      ['c', { pairs: [{ cards: [0, 4], reason: 'Altro' }, { cards: [1, 2], reason: 'Altro' }] }]
+    ]),
+    votes: new Map()
+  };
+  const [identical, different] = comparisons(room);
+  assert.equal(identical.equivalent, true);
+  assert.equal(different.equivalent, false);
+  room.votes.set(different.key + '|c', false);
+  assert.deepEqual(calculateRoundResults(room), {
+    a: { gain: 3, details: [
+      { cards: [0, 1], partner: 'Paolo', points: 2 },
+      { cards: [2, 3], partner: 'Paolo', points: 1 }
+    ] },
+    b: { gain: 3, details: [
+      { cards: [0, 1], partner: 'Mamma', points: 2 },
+      { cards: [2, 3], partner: 'Mamma', points: 1 }
+    ] },
+    c: { gain: 0, details: [] }
+  });
 });

@@ -4,3 +4,17 @@
 .alert button{float:right}
 button:focus-visible,input:focus-visible{outline:3px solid #d8c7ff;outline-offset:2px}
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+.reveal-group{padding:8px 0}
+.reveal-row,.excluded-row{display:grid;align-items:center;gap:10px;padding:6px 0;overflow-wrap:anywhere}
+.reveal-row{grid-template-columns:auto minmax(0,1fr) minmax(0,min(28%,8rem))}
+.reveal-row b{text-align:right}
+.excluded-row{grid-template-columns:2rem minmax(0,1fr)}
+.card-icons{white-space:nowrap;font-size:1.2rem}
+.score-name{background:transparent;color:#dbcaff;padding:5px;text-decoration:underline;overflow-wrap:anywhere}
+.score-totals{display:flex;gap:12px;flex-shrink:0;white-space:nowrap}
+.round-gain{color:#c3f6bd}
+.score-dialog{color:inherit;width:min(30rem,calc(100% - 2rem));margin:auto;overflow-wrap:anywhere}
+.score-dialog::backdrop{background:#100f20cc}
+.score-dialog h2{margin-top:0}
+.score-dialog .player{gap:12px}
+.score-dialog>button{margin-top:16px}

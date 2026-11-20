@@ -19,6 +19,8 @@ createApp({
     const selected = ref([]);
     const pairs = ref([]);
     const reasons = ref(['', '']);
+    const scoreDialog = ref(null);
+    const scorePlayer = ref(null);
     const me = computed(() => state.value?.players.find(p => p.id === state.value.me));
     const used = computed(() => pairs.value.flat());
     const odd = computed(() => [0, 1, 2, 3, 4].find(i => !used.value.includes(i)));
@@ -26,6 +28,23 @@ createApp({
     const sortedPlayers = computed(() => [...(state.value?.players || [])].sort((a, b) => b.score - a.score));
     const playerName = id => state.value?.players.find(p => p.id === id)?.name || 'Giocatore';
     const cardName = i => state.value?.cards[i]?.word || '?';
+    const cardIcon = i => state.value?.cards[i]?.emoji || '';
+    const revealedPairs = computed(() => {
+      const groups = new Map();
+      for (const [id, answer] of Object.entries(state.value?.answers || {})) {
+        for (const pair of answer.pairs) {
+          const cards = [...pair.cards].sort((a, b) => a - b);
+          const key = cards.join('-');
+          if (!groups.has(key)) groups.set(key, { key, cards, responses: [] });
+          groups.get(key).responses.push({ id, reason: pair.reason });
+        }
+      }
+      return [...groups.values()].sort((a, b) =>
+        b.responses.length - a.responses.length || a.key.localeCompare(b.key));
+    });
+    const excludedCards = computed(() => Object.entries(state.value?.answers || {})
+      .map(([id, answer]) => ({ id, card: answer.odd }))
+      .sort((a, b) => a.card - b.card));
     const readyMessage = computed(() => `${state.value?.readyCount || 0} / ${state.value?.players.length || 0} pronti`);
 
     function emit(event, payload = {}) {
@@ -72,13 +91,24 @@ createApp({
       });
     }
     function vote(comparison, value) { emit('vote', { key: comparison.key, value }); }
+    function showScore(player) {
+      scorePlayer.value = player;
+      scoreDialog.value.showModal();
+    }
+    function closeScore() { scoreDialog.value?.close(); }
     async function copyInvite() {
       if (!state.value) return;
       const link = `${location.origin}/?room=${state.value.code}`;
       try { await navigator.clipboard.writeText(link); error.value = ''; }
       catch { error.value = `Copia questo link per invitare gli amici: ${link}`; }
     }
-    function resetRound() { selected.value = []; pairs.value = []; reasons.value = ['', '']; }
+    function resetRound() {
+      closeScore();
+      scorePlayer.value = null;
+      selected.value = [];
+      pairs.value = [];
+      reasons.value = ['', ''];
+    }
     function clearSession() {
       localStorage.removeItem(storageKey);
       state.value = null;
@@ -147,7 +177,8 @@ createApp({
 
     return {
       state, name, code, error, connected, connecting, serverUrl, me, sortedPlayers,
-      selected, pairs, reasons, used, odd, canSubmit, playerName, cardName, readyMessage,
+      selected, pairs, reasons, used, odd, canSubmit, playerName, cardName, cardIcon, readyMessage,
+      revealedPairs, excludedCards, scoreDialog, scorePlayer, showScore, closeScore,
       create, join, ready, pick, remove, submit, vote, copyInvite, leave, leaving
     };
   },
@@ -222,10 +253,19 @@ createApp({
 
           <section v-if="state.phase==='reveal'" class="panel">
             <h1>Le risposte!</h1>
-            <div v-for="(answer,id) in state.answers" :key="id" class="answer">
-              <h2>{{playerName(id)}}</h2>
-              <p v-for="(pair,i) in answer.pairs" :key="i"><b>{{cardName(pair.cards[0])}} + {{cardName(pair.cards[1])}}</b>: {{pair.reason}}</p>
-              <small>Esclusa: {{cardName(answer.odd)}}</small>
+            <div v-for="group in revealedPairs" :key="group.key" class="answer reveal-group">
+              <div v-for="response in group.responses" :key="response.id" class="reveal-row">
+                <span class="card-icons" role="img" :aria-label="group.cards.map(cardName).join(' + ')">
+                  {{group.cards.map(cardIcon).join(' + ')}}
+                </span>
+                <span>{{response.reason}}</span>
+                <b>{{playerName(response.id)}}</b>
+              </div>
+            </div>
+            <h2>Carte escluse</h2>
+            <div v-for="item in excludedCards" :key="item.id" class="excluded-row">
+              <span class="card-icons" role="img" :aria-label="cardName(item.card)">{{cardIcon(item.card)}}</span>
+              <b>{{playerName(item.id)}}</b>
             </div>
             <button type="button" :disabled="state.myReady || !connected" @click="ready">
               {{state.myReady ? '✓ In attesa degli altri' : 'Ho letto le risposte: continua'}}
@@ -252,7 +292,32 @@ createApp({
 
           <section v-if="state.phase==='results' || state.phase==='finished'" class="panel">
             <h1>{{state.phase==='finished'?'Classifica finale':'Risultati del round'}}</h1>
-            <div v-for="(p,i) in sortedPlayers" :key="p.id" class="player"><span><b>{{i+1}}.</b> {{p.name}}</span><b>{{p.score}} pt</b></div>
+            <div v-for="(p,i) in sortedPlayers" :key="p.id" class="player">
+              <span>
+                <b>{{i+1}}.</b>
+                <button v-if="state.roundResults?.[p.id]?.gain > 0" type="button" class="score-name"
+                  aria-haspopup="dialog" @click="showScore(p)">{{p.name}}</button>
+                <template v-else> {{p.name}}</template>
+              </span>
+              <span class="score-totals">
+                <b v-if="state.roundResults?.[p.id]" class="round-gain"
+                  :aria-label="'Punti del round: '+state.roundResults[p.id].gain">+{{state.roundResults[p.id].gain}}</b>
+                <b>{{p.score}} pt</b>
+              </span>
+            </div>
+            <dialog ref="scoreDialog" class="panel score-dialog" aria-labelledby="score-title">
+              <template v-if="scorePlayer">
+                <h2 id="score-title">Punti del round · {{scorePlayer.name}}</h2>
+                <div v-for="(detail,i) in state.roundResults?.[scorePlayer.id]?.details" :key="i" class="player">
+                  <span>
+                    <span aria-hidden="true">{{detail.cards.map(cardIcon).join(' + ')}}</span>
+                    {{detail.cards.map(cardName).join(' + ')}} con <b>{{detail.partner}}</b>
+                  </span>
+                  <b class="round-gain">+{{detail.points}}</b>
+                </div>
+              </template>
+              <button type="button" class="secondary" autofocus @click="closeScore">Chiudi</button>
+            </dialog>
             <button type="button" :disabled="state.myReady || !connected" @click="ready">
               {{state.myReady ? '✓ In attesa degli altri' : (state.phase==='finished'?'Nuova partita':'Prossimo round')}}
             </button>

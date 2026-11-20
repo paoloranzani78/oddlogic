@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import { Server } from 'socket.io';
 import { deck } from './deck.js';
 import { createDrawPile, drawCards } from './deal.js';
-import { calculateScores, comparisons } from './scoring.js';
+import { calculateRoundResults, comparisons } from './scoring.js';
 
 const app = express();
 const server = http.createServer(app);
@@ -48,7 +48,8 @@ function view(room, playerId) {
     myReady: room.ready.has(playerId),
     cards: room.cards,
     answers: showAnswers ? Object.fromEntries(room.answers) : undefined,
-    comparisons: ['voting', 'results'].includes(room.phase) ? comparisons(room) : [],
+    comparisons: room.phase === 'voting' ? comparisons(room).filter(c => !c.equivalent) : [],
+    roundResults: room.phase === 'results' ? room.roundResults : undefined,
     myAnswer: room.answers.get(playerId) || null
   };
 }
@@ -98,6 +99,7 @@ function startRound(room) {
   room.answers.clear();
   room.votes.clear();
   room.ready.clear();
+  room.roundResults = null;
   room.phase = 'playing';
 }
 function resetGame(room) {
@@ -108,6 +110,7 @@ function resetGame(room) {
   room.ready.clear();
   room.cards = [];
   room.drawPile = [];
+  room.roundResults = null;
   room.phase = 'lobby';
 }
 function revealIfEverybodyAnswered(room) {
@@ -119,9 +122,9 @@ function revealIfEverybodyAnswered(room) {
 function finishVotesIfReady(room) {
   if (room.phase !== 'voting') return;
   const items = comparisons(room);
-  if (!items.every(c => Object.values(c.votes).every(v => v !== null))) return;
-  const gains = calculateScores(room);
-  for (const p of room.players) p.score += gains[p.id];
+  if (!items.every(c => c.equivalent || Object.values(c.votes).every(v => v !== null))) return;
+  room.roundResults = calculateRoundResults(room, items);
+  for (const p of room.players) p.score += room.roundResults[p.id].gain;
   room.phase = 'results';
   room.ready.clear();
 }
@@ -245,7 +248,8 @@ io.on('connection', socket => {
     const p = playerFromSocket(room, socket);
     if (!p || room.phase !== 'voting' || typeof payload.value !== 'boolean') return;
     const c = comparisons(room).find(c => c.key === payload.key);
-    if (!c || p.id === c.aId || p.id === c.bId) return sendError(socket, 'Non puoi votare questa coppia.', ack);
+    if (!c || c.equivalent || p.id === c.aId || p.id === c.bId)
+      return sendError(socket, 'Non puoi votare questa coppia.', ack);
     room.votes.set(c.key + '|' + p.id, payload.value);
     finishVotesIfReady(room);
     sendState(room);

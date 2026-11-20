@@ -90,7 +90,7 @@ Apri `http://localhost:3001/health`. Per provare il frontend locale, modifica te
 
 ## Punteggi e limitazioni
 
-**Punteggio sperimentale, non quello ufficiale**: +1 a ciascuno per ogni coppia identica condivisa con un altro giocatore; +1 bonus se la maggioranza stretta dei terzi considera equivalente la motivazione. Nessun bonus in caso di parità.
+**Punteggio sperimentale**: +1 a ciascuno per ogni coppia condivisa con un altro giocatore. Le motivazioni identiche ignorando maiuscole e minuscole danno automaticamente +1 bonus. Per motivazioni diverse, il bonus richiede il voto favorevole della maggioranza stretta degli altri giocatori.
 
 - Il mazzo contiene 6 combinazioni di cinque carte, con emoji segnaposto per future illustrazioni originali.
 - Stanze, risposte e punteggi sono solo in RAM; si perdono dopo un riavvio di Render.
