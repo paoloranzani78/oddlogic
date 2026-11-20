@@ -16,15 +16,18 @@ createApp({
     const connected = ref(false);
     const connecting = ref(Boolean(socket));
     const leaving = ref(false);
-    const selected = ref([]);
-    const pairs = ref([]);
+    const slots = ref([null, null, null, null]);
+    const draggedCard = ref(null);
     const reasons = ref(['', '']);
     const scoreDialog = ref(null);
     const scorePlayer = ref(null);
     const me = computed(() => state.value?.players.find(p => p.id === state.value.me));
-    const used = computed(() => pairs.value.flat());
+    const used = computed(() => slots.value.filter(card => card !== null));
+    const nextSlot = computed(() => slots.value.indexOf(null));
     const odd = computed(() => [0, 1, 2, 3, 4].find(i => !used.value.includes(i)));
-    const canSubmit = computed(() => pairs.value.length === 2 && reasons.value.every(x => x.trim().length > 0));
+    const canEdit = computed(() => connected.value && !leaving.value && state.value?.phase === 'playing' && !state.value.myAnswer);
+    const canSubmit = computed(() => canEdit.value && nextSlot.value === -1 &&
+      reasons.value.every(reason => reason.trim().length > 0));
     const sortedPlayers = computed(() => [...(state.value?.players || [])].sort((a, b) => b.score - a.score));
     const playerName = id => state.value?.players.find(p => p.id === id)?.name || 'Giocatore';
     const cardName = i => state.value?.cards[i]?.word || '?';
@@ -73,21 +76,38 @@ createApp({
       emit('join', { name: name.value.trim(), code: roomCode });
     }
     function ready() { if (!state.value?.myReady) emit('ready'); }
-    function pick(i) {
-      if (pairs.value.length === 2 || used.value.includes(i) || state.value?.myAnswer) return;
-      if (selected.value.includes(i)) { selected.value = selected.value.filter(x => x !== i); return; }
-      selected.value.push(i);
-      if (selected.value.length === 2) { pairs.value.push([...selected.value]); selected.value = []; }
+    function placeCard(card, slot = nextSlot.value) {
+      if (!canEdit.value || used.value.includes(card) || slots.value[slot] !== null) return;
+      slots.value[slot] = card;
     }
-    function remove(i) {
-      if (state.value?.myAnswer) return;
-      pairs.value.splice(i, 1);
-      reasons.value.splice(i, 1);
-      reasons.value.push('');
+    function removeCard(slot) {
+      if (canEdit.value) slots.value[slot] = null;
+    }
+    function startDrag(event, card) {
+      if (!canEdit.value || used.value.includes(card) || nextSlot.value === -1) {
+        event.preventDefault();
+        return;
+      }
+      draggedCard.value = card;
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', cardName(card));
+    }
+    function endDrag() { draggedCard.value = null; }
+    function allowDrop(event, slot) {
+      if (canEdit.value && draggedCard.value !== null && slots.value[slot] === null) {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+      }
+    }
+    function dropCard(slot) {
+      if (draggedCard.value !== null) placeCard(draggedCard.value, slot);
+      endDrag();
     }
     function submit() {
       if (canSubmit.value) emit('answer', {
-        pairs: pairs.value.map((cards, i) => ({ cards, reason: reasons.value[i].trim() }))
+        pairs: reasons.value.map((reason, i) => ({
+          cards: slots.value.slice(i * 2, i * 2 + 2), reason: reason.trim()
+        }))
       });
     }
     function vote(comparison, value) { emit('vote', { key: comparison.key, value }); }
@@ -105,8 +125,8 @@ createApp({
     function resetRound() {
       closeScore();
       scorePlayer.value = null;
-      selected.value = [];
-      pairs.value = [];
+      slots.value = [null, null, null, null];
+      endDrag();
       reasons.value = ['', ''];
     }
     function clearSession() {
@@ -177,9 +197,10 @@ createApp({
 
     return {
       state, name, code, error, connected, connecting, serverUrl, me, sortedPlayers,
-      selected, pairs, reasons, used, odd, canSubmit, playerName, cardName, cardIcon, readyMessage,
+      slots, reasons, used, nextSlot, odd, canEdit, canSubmit, draggedCard, playerName, cardName, cardIcon, readyMessage,
       revealedPairs, excludedCards, scoreDialog, scorePlayer, showScore, closeScore,
-      create, join, ready, pick, remove, submit, vote, copyInvite, leave, leaving
+      create, join, ready, placeCard, removeCard, startDrag, endDrag, allowDrop, dropCard,
+      submit, vote, copyInvite, leave, leaving
     };
   },
   template: `
@@ -229,22 +250,44 @@ createApp({
           <div class="round">{{state.phase==='finished'?'Partita conclusa':'Round '+(state.round+1)+' di '+state.totalRounds}}</div>
           <section v-if="state.phase==='playing'" class="panel">
             <h1>Trova due connessioni</h1>
-            <p>Seleziona quattro carte per creare due coppie. Una resterà esclusa.</p>
+            <p>Tocca una carta per inserirla nel primo slot libero. Con il mouse puoi anche trascinarla nello slot che preferisci.</p>
             <div class="cards">
               <button type="button" v-for="(card,i) in state.cards" :key="i" class="gamecard"
-                :class="{active:selected.includes(i),used:used.includes(i)}"
-                :disabled="!!state.myAnswer || used.includes(i) || pairs.length===2 || !connected" @click="pick(i)">
+                :class="{used:used.includes(i)}"
+                :disabled="!canEdit || used.includes(i) || nextSlot===-1"
+                :draggable="canEdit && !used.includes(i) && nextSlot!==-1"
+                @click="placeCard(i)" @dragstart="startDrag($event, i)" @dragend="endDrag">
                 <span class="emoji" aria-hidden="true">{{card.emoji}}</span><b>{{card.word}}</b>
               </button>
             </div>
             <template v-if="!state.myAnswer">
-              <div v-for="(pair,i) in pairs" :key="i" class="pair">
-                <div class="pairtitle"><b>Coppia {{i+1}}: {{cardName(pair[0])}} + {{cardName(pair[1])}}</b>
-                  <button type="button" class="tiny" @click="remove(i)">Rimuovi</button></div>
-                <label class="input-label" :for="'reason-'+i">Perché sono collegate?</label>
-                <input :id="'reason-'+i" :name="'reason-'+i" v-model="reasons[i]" maxlength="80" placeholder="Motivazione" />
+              <div class="pair-builder">
+                <fieldset v-for="(_,i) in reasons" :key="i" class="pair-equation">
+                  <legend>Coppia {{i+1}}</legend>
+                  <div class="pair-slots">
+                    <template v-for="slot in [i*2, i*2+1]" :key="slot">
+                      <span v-if="slot%2" class="pair-symbol" aria-hidden="true">+</span>
+                      <div class="card-slot"
+                        :class="{filled:slots[slot]!==null, next:slot===nextSlot, droppable:draggedCard!==null && slots[slot]===null}"
+                        @dragover="allowDrop($event, slot)" @drop.prevent="dropCard(slot)">
+                        <button v-if="slots[slot]!==null" type="button" :disabled="!canEdit"
+                          :aria-label="'Rimuovi '+cardName(slots[slot])+' dalla coppia '+(i+1)" @click="removeCard(slot)">
+                          <span class="slot-emoji" aria-hidden="true">{{cardIcon(slots[slot])}}</span>
+                          <span>{{cardName(slots[slot])}}</span>
+                          <span class="slot-remove" aria-hidden="true">×</span>
+                        </button>
+                        <span v-else>Vuoto</span>
+                      </div>
+                    </template>
+                  </div>
+                  <div class="pair-motivation">
+                    <span class="pair-symbol" aria-hidden="true">=</span>
+                    <label class="visually-hidden" :for="'reason-'+i">Motivazione della coppia {{i+1}}</label>
+                    <input :id="'reason-'+i" :name="'reason-'+i" v-model="reasons[i]" maxlength="80" placeholder="Cosa le unisce?" />
+                  </div>
+                </fieldset>
               </div>
-              <div v-if="pairs.length===2" class="odd">Carta esclusa: <b>{{cardName(odd)}}</b></div>
+              <div v-if="nextSlot===-1" class="odd">Carta esclusa: <b><span aria-hidden="true">{{cardIcon(odd)}}</span> {{cardName(odd)}}</b></div>
               <button type="button" :disabled="!canSubmit || !connected" @click="submit">Conferma risposta</button>
             </template>
             <div v-else class="notice">✓ Risposta inviata. Attendi gli altri giocatori.</div>

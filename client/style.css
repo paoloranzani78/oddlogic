@@ -18,3 +18,22 @@ button:focus-visible,input:focus-visible{outline:3px solid #d8c7ff;outline-offse
 .score-dialog h2{margin-top:0}
 .score-dialog .player{gap:12px}
 .score-dialog>button{margin-top:16px}
+.gamecard[draggable="true"]{cursor:grab;touch-action:manipulation}
+.gamecard[draggable="true"]:hover{border-color:#bfa6ff;background:#352c56}
+.pair-builder{display:grid;gap:12px;margin-bottom:16px}
+.pair-equation{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center;gap:10px;min-width:0;margin:0;padding:10px 12px 12px;border:1px solid #4b426b;border-radius:16px;background:#211e3a}
+.pair-equation legend{padding:0 6px;color:#dbcaff;font-size:13px;font-weight:750}
+.pair-slots,.pair-motivation{display:grid;align-items:center;gap:8px}
+.pair-slots{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)}
+.pair-motivation{grid-template-columns:auto minmax(0,1fr)}
+.pair-motivation input{min-width:0;margin:0;padding:12px}
+.pair-symbol{color:#c7b6ff;font-size:20px;font-weight:750}
+.card-slot{display:grid;place-items:center;min-height:72px;border:2px dashed #6c5e91;border-radius:12px;color:#b9b2d5;font-size:12px}
+.card-slot.next{border-color:#bfa6ff;background:#30264e}
+.card-slot.droppable{border-color:#d9c5ff;background:#40315f}
+.card-slot.filled{border-style:solid;border-color:#7762a4;background:#30264e}
+.card-slot button{position:relative;display:grid;place-items:center;gap:2px;width:100%;min-height:68px;padding:8px 4px;border-radius:10px;background:transparent;color:#f5f3ff;font-size:12px;overflow-wrap:anywhere;touch-action:manipulation}
+.slot-emoji{font-size:24px}
+.slot-remove{position:absolute;top:2px;right:5px;color:#d8c7ff;font-size:15px}
+.visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+@media(max-width:520px){.pair-equation{grid-template-columns:minmax(0,1fr)}}
