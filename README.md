@@ -80,7 +80,7 @@ Apri `http://localhost:3001/health`. Per provare il frontend locale, modifica te
 
 ## Flusso di gioco
 
-- Un giocatore crea una stanza, gli altri entrano con il codice di sei caratteri.
+- Un giocatore crea una stanza, gli altri entrano con il codice di quattro lettere (per esempio `DXCA`).
 - Tutti premono **Sono pronto** (non esiste un giocatore amministratore): con almeno tre partecipanti il server avvia il turno.
 - Ciascuno forma due coppie, motiva le associazioni ed esclude una carta.
 - Dopo l'invio di tutte le risposte, ogni giocatore conferma di aver letto le risposte per passare alle votazioni.

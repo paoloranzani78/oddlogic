@@ -14,6 +14,7 @@ const io = new Server(server, { cors: { origin: allowedOrigins } });
 const rooms = new Map();
 const MIN_PLAYERS = 3;
 const MAX_PLAYERS = 6;
+const ROOM_CODE_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const clean = value => String(value ?? '').trim().slice(0, 80);
 
 app.get('/', (_req, res) => res.json({ app: 'Odd Logic Server', status: 'ok' }));
@@ -21,8 +22,12 @@ app.get('/health', (_req, res) => res.json({ ok: true, rooms: rooms.size }));
 
 function createCode() {
   let code;
-  do { code = crypto.randomBytes(3).toString('hex').toUpperCase(); }
-  while (rooms.has(code));
+  do {
+    code = '';
+    for (let i = 0; i < 4; i++) {
+      code += ROOM_CODE_ALPHABET[crypto.randomInt(ROOM_CODE_ALPHABET.length)];
+    }
+  } while (rooms.has(code));
   return code;
 }
 
@@ -158,6 +163,7 @@ io.on('connection', socket => {
   });
   socket.on('join', (payload = {}, ack) => {
     const code = clean(payload?.code).toUpperCase();
+    if (!/^[A-Z]{4}$/.test(code)) return sendError(socket, 'Il codice stanza deve contenere quattro lettere da A a Z.', ack);
     const room = rooms.get(code);
     if (!room) return sendError(socket, 'Stanza non trovata. Verifica il codice oppure crea una nuova stanza.', ack);
     let p = payload?.token ? room.players.find(v => v.token === payload.token) : null;

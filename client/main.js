@@ -46,8 +46,12 @@ createApp({
     }
     function join() {
       if (!name.value.trim()) { error.value = 'Inserisci il tuo nickname.'; return; }
-      if (!code.value.trim()) { error.value = 'Inserisci il codice stanza.'; return; }
-      emit('join', { name: name.value.trim(), code: code.value.trim().toUpperCase() });
+      const roomCode = code.value.trim().toUpperCase();
+      if (!/^[A-Z]{4}$/.test(roomCode)) {
+        error.value = 'Il codice stanza deve contenere quattro lettere da A a Z.';
+        return;
+      }
+      emit('join', { name: name.value.trim(), code: roomCode });
     }
     function ready() { if (!state.value?.myReady) emit('ready'); }
     function pick(i) {
@@ -166,7 +170,7 @@ createApp({
         <button type="button" :disabled="!connected" @click="create">Crea una stanza</button>
         <div class="separator">oppure</div>
         <label class="input-label" for="room-code">Codice della stanza</label>
-        <input id="room-code" name="room-code" v-model="code" maxlength="6" placeholder="Es. A1B2C3" autocapitalize="characters" />
+        <input id="room-code" name="room-code" v-model="code" maxlength="4" placeholder="Es. DXCA" autocapitalize="characters" />
         <button type="button" class="secondary" :disabled="!connected" @click="join">Entra nella stanza</button>
       </section>
 
