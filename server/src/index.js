@@ -95,6 +95,22 @@ function startRound(room) {
   room.ready.clear();
   room.phase = 'playing';
 }
+function resetGame(room) {
+  for (const p of room.players) p.score = 0;
+  room.round = 0;
+  room.answers.clear();
+  room.votes.clear();
+  room.ready.clear();
+  room.cards = [];
+  room.drawPile = [];
+  room.phase = 'lobby';
+}
+function revealIfEverybodyAnswered(room) {
+  if (room.phase === 'playing' && room.answers.size === room.players.length) {
+    room.phase = 'reveal';
+    room.ready.clear();
+  }
+}
 function finishVotesIfReady(room) {
   if (room.phase !== 'voting') return;
   const items = comparisons(room);
@@ -122,14 +138,7 @@ function advanceWhenEverybodyReady(room) {
     if (room.round >= room.totalRounds) room.phase = 'finished';
     else startRound(room);
   } else if (room.phase === 'finished') {
-    for (const p of room.players) p.score = 0;
-    room.round = 0;
-    room.answers.clear();
-    room.votes.clear();
-    room.ready.clear();
-    room.cards = [];
-    room.drawPile = [];
-    room.phase = 'lobby';
+    resetGame(room);
   }
 }
 
@@ -151,7 +160,8 @@ io.on('connection', socket => {
     const code = clean(payload?.code).toUpperCase();
     const room = rooms.get(code);
     if (!room) return sendError(socket, 'Stanza non trovata. Verifica il codice oppure crea una nuova stanza.', ack);
-    let p = payload.token ? room.players.find(v => v.token === payload.token) : null;
+    let p = payload?.token ? room.players.find(v => v.token === payload.token) : null;
+    if (payload?.token && !p) return sendError(socket, 'Sessione scaduta.', ack);
     if (!p) {
       if (room.phase !== 'lobby') return sendError(socket, 'La partita è già iniziata.', ack);
       if (room.players.length >= MAX_PLAYERS) return sendError(socket, 'Stanza piena (massimo 6 persone).', ack);
@@ -164,6 +174,35 @@ io.on('connection', socket => {
     }
     enter(socket, room, p);
     if (typeof ack === 'function') ack({ ok: true, code: room.code });
+  });
+  socket.on('leave', (_payload, ack) => {
+    const room = currentRoom(socket);
+    const p = playerFromSocket(room, socket);
+    if (p) {
+      socket.leave(room.code);
+      delete socket.data.code;
+      delete socket.data.playerId;
+      room.players = room.players.filter(player => player !== p);
+      room.ready.delete(p.id);
+      room.answers.delete(p.id);
+      for (const key of room.votes.keys()) {
+        const [authorA, authorB, , voter] = key.split('|');
+        if ([authorA, authorB, voter].includes(p.id)) room.votes.delete(key);
+      }
+      if (!room.players.length) {
+        rooms.delete(room.code);
+      } else {
+        if (room.players.length < MIN_PLAYERS && room.phase !== 'lobby') {
+          resetGame(room);
+        } else {
+          revealIfEverybodyAnswered(room);
+          finishVotesIfReady(room);
+          advanceWhenEverybodyReady(room);
+        }
+        sendState(room);
+      }
+    }
+    if (typeof ack === 'function') ack({ ok: true });
   });
   socket.on('ready', (_payload, ack) => {
     const room = currentRoom(socket);
@@ -191,10 +230,7 @@ io.on('connection', socket => {
       pairs: pairs.map(pair => ({ cards: pair.cards, reason: clean(pair.reason) })),
       odd: [0, 1, 2, 3, 4].find(i => !cards.includes(i))
     });
-    if (room.answers.size === room.players.length) {
-      room.phase = 'reveal';
-      room.ready.clear();
-    }
+    revealIfEverybodyAnswered(room);
     sendState(room);
     if (typeof ack === 'function') ack({ ok: true });
   });

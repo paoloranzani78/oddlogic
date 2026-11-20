@@ -5,16 +5,17 @@ import { io } from 'https://esm.sh/socket.io-client@4.8.1';
 const serverUrl = String(window.ODD_LOGIC_SERVER_URL || '').trim().replace(/\/$/, '');
 const socket = serverUrl ? io(serverUrl, { autoConnect: false, reconnection: true, timeout: 10000 }) : null;
 const storageKey = 'odd-logic-session-v2';
-const roomFromUrl = new URLSearchParams(location.search).get('room') || '';
+const roomFromUrl = () => new URLSearchParams(location.search).get('room')?.toUpperCase() || '';
 
 createApp({
   setup() {
     const state = ref(null);
     const name = ref('');
-    const code = ref(roomFromUrl.toUpperCase());
+    const code = ref(roomFromUrl());
     const error = ref('');
     const connected = ref(false);
     const connecting = ref(Boolean(socket));
+    const leaving = ref(false);
     const selected = ref([]);
     const pairs = ref([]);
     const reasons = ref(['', '']);
@@ -28,6 +29,7 @@ createApp({
     const readyMessage = computed(() => `${state.value?.readyCount || 0} / ${state.value?.players.length || 0} pronti`);
 
     function emit(event, payload = {}) {
+      if (leaving.value) return;
       if (!socket || !connected.value) {
         error.value = 'Server multiplayer non connesso. Controlla la configurazione di Render.';
         return;
@@ -73,6 +75,29 @@ createApp({
       catch { error.value = `Copia questo link per invitare gli amici: ${link}`; }
     }
     function resetRound() { selected.value = []; pairs.value = []; reasons.value = ['', '']; }
+    function clearSession() {
+      localStorage.removeItem(storageKey);
+      state.value = null;
+      code.value = '';
+      resetRound();
+      const url = new URL(location.href);
+      url.searchParams.delete('room');
+      history.replaceState(null, '', url);
+    }
+    function leave() {
+      if (!state.value || !connected.value || leaving.value) return;
+      if (!window.confirm('Vuoi uscire dalla partita?')) return;
+      leaving.value = true;
+      error.value = '';
+      socket.timeout(12000).emit('leave', {}, (err, result) => {
+        leaving.value = false;
+        if (err || !result?.ok) {
+          error.value = 'Uscita non confermata dal server. Riprova.';
+          return;
+        }
+        clearSession();
+      });
+    }
     function getSavedSession() {
       try { return JSON.parse(localStorage.getItem(storageKey) || 'null'); }
       catch { localStorage.removeItem(storageKey); return null; }
@@ -80,18 +105,20 @@ createApp({
     function rejoin() {
       const saved = getSavedSession();
       if (!saved || !saved.code || !saved.token) return;
-      if (roomFromUrl && saved.code !== roomFromUrl.toUpperCase()) return;
+      const invitedRoom = roomFromUrl();
+      if (invitedRoom && saved.code !== invitedRoom) return;
       socket.timeout(12000).emit('join', { code: saved.code, token: saved.token }, (err, result) => {
         if (err) return;
         if (result && !result.ok) {
-          localStorage.removeItem(storageKey);
+          clearSession();
           error.value = 'La vecchia stanza non è più disponibile. Puoi crearne una nuova.';
         }
       });
     }
     function onState(next) {
       if (!state.value || state.value.round !== next.round ||
-          (state.value.phase === 'finished' && next.phase === 'lobby')) resetRound();
+          state.value.code !== next.code ||
+          (state.value.phase !== 'lobby' && next.phase === 'lobby')) resetRound();
       state.value = next;
       code.value = next.code;
       history.replaceState(null, '', `/?room=${next.code}`);
@@ -117,7 +144,7 @@ createApp({
     return {
       state, name, code, error, connected, connecting, serverUrl, me, sortedPlayers,
       selected, pairs, reasons, used, odd, canSubmit, playerName, cardName, readyMessage,
-      create, join, ready, pick, remove, submit, vote, copyInvite
+      create, join, ready, pick, remove, submit, vote, copyInvite, leave, leaving
     };
   },
   template: `
@@ -145,6 +172,9 @@ createApp({
 
       <template v-else>
         <div class="roomline"><span>STANZA <b>{{state.code}}</b></span><span>{{me?.name}} · {{state.players.length}} giocatori</span></div>
+        <button type="button" class="secondary" :disabled="!connected || leaving" @click="leave">
+          {{leaving ? 'Uscita in corso…' : 'Esci dalla partita'}}
+        </button>
         <section v-if="state.phase==='lobby'" class="panel">
           <h1>Sala d'attesa</h1>
           <p>Condividi il codice <b>{{state.code}}</b> con gli altri giocatori.</p>
